@@ -14,8 +14,14 @@
     "node": ">=4"
   },
   "scripts": {
+    "test": "ava",
     "build": "webpack",
-    "test": "ava"
+    "bump": "npm version patch -m \"v%s\"",
+    "bump:minor": "npm version minor -m \"v%s\"",
+    "bump:major": "npm version major -m \"v%s\"",
+    "preversion": "npm test",
+    "postversion": "git push && git push --tags",
+    "prepublish": "npm run build"
   },
   "ava": {
     "require": [
@@ -40,7 +46,7 @@
   "dependencies": {
     "debug": "^2.6.0",
     "ramda": "^0.23.0",
-    "shirt": "^0.0.6"
+    "shirt": "^0.1.1"
   },
   "devDependencies": {
     "ava": "^0.17.0",
