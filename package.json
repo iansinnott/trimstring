@@ -32,12 +32,15 @@
     "src/index.js"
   ],
   "keywords": [
-    ""
+    "trim",
+    "string",
+    "template",
+    "interpolation"
   ],
   "dependencies": {
     "debug": "^2.6.0",
     "ramda": "^0.23.0",
-    "shirt": "^0.0.4"
+    "shirt": "^0.0.6"
   },
   "devDependencies": {
     "ava": "^0.17.0",

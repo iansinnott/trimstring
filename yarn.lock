@@ -2967,9 +2967,9 @@ sha.js@^2.3.6:
   dependencies:
     inherits "^2.0.1"
 
-shirt@^0.0.4:
-  version "0.0.4"
-  resolved "https://registry.yarnpkg.com/shirt/-/shirt-0.0.4.tgz#ce878babccbabd0905b9e1f57222dc7795be7650"
+shirt@^0.0.6:
+  version "0.0.6"
+  resolved "https://registry.yarnpkg.com/shirt/-/shirt-0.0.6.tgz#20f853b3a4a0167c43284972455a6336637b0b6d"
   dependencies:
     ramda "^0.23.0"
 

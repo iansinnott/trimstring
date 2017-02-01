@@ -1,4 +1,7 @@
-# trimstring [![Build Status](https://travis-ci.org/iansinnott/trimstring.svg?branch=master)](https://travis-ci.org/iansinnott/trimstring)
+# trimstring
+
+[![Build Status](https://img.shields.io/circleci/project/iansinnott/trimstring.svg)](https://circleci.com/gh/iansinnott/trimstring)
+[![trimstring on NPM](https://img.shields.io/npm/v/trimstring.svg)](https://www.npmjs.com/package/trimstring)
 
 > Neatly trim template strings
 
@@ -9,36 +12,52 @@
 $ npm install --save trimstring
 ```
 
-
 ## Usage
 
 ```js
 const trimstring = require('trimstring');
 
-trimstring('unicorns');
-//=> 'unicorns & rainbows'
+const genHtml = props => {
+  return trimstring(`
+    <!doctype html>
+    <html lang='en'>
+      <head>
+        <meta charset='utf-8'>
+        <title>${props.title}</title>
+      </head>
+      <body>
+        ${props.body}
+      </body>
+    </html>
+  `);
+};
+
+// Leading whitespace and trailing newlines will be trimmed.
+genHtml({ title: 'Trimstring', body: 'This is my favorite library!' }); //=>
+`<!doctype html>
+<html lang='en'>
+  <head>
+    <meta charset='utf-8'>
+    <title>Trimstring</title>
+  </head>
+  <body>
+    This is my favorite library!
+  </body>
+</html>`
 ```
 
 
 ## API
 
-### trimstring(input, [options])
+### trimstring(templateString)
 
-#### input
+#### templateString
 
 Type: `string`
 
-Lorem ipsum.
+A multiline string for trimming.
 
-#### options
-
-##### foo
-
-Type: `boolean`<br>
-Default: `false`
-
-Lorem ipsum.
-
+**NOTE:** If your string does not need multiple lines then trimstring probably won't help you. The core use of this library is for creating strings without leading whitespace or trailing/leading newlines but allowing you to still write your code in a readable way.
 
 ## License
 
