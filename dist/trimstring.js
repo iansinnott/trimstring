@@ -982,6 +982,678 @@ module.exports = _curry1(function toString(val) { return _toString(val, []); });
 /* 26 */
 /***/ (function(module, exports, __webpack_require__) {
 
+/* WEBPACK VAR INJECTION */(function(process) {/**
+ * This is the web browser implementation of `debug()`.
+ *
+ * Expose `debug()` as the module.
+ */
+
+exports = module.exports = __webpack_require__(42);
+exports.log = log;
+exports.formatArgs = formatArgs;
+exports.save = save;
+exports.load = load;
+exports.useColors = useColors;
+exports.storage = 'undefined' != typeof chrome
+               && 'undefined' != typeof chrome.storage
+                  ? chrome.storage.local
+                  : localstorage();
+
+/**
+ * Colors.
+ */
+
+exports.colors = [
+  'lightseagreen',
+  'forestgreen',
+  'goldenrod',
+  'dodgerblue',
+  'darkorchid',
+  'crimson'
+];
+
+/**
+ * Currently only WebKit-based Web Inspectors, Firefox >= v31,
+ * and the Firebug extension (any Firefox version) are known
+ * to support "%c" CSS customizations.
+ *
+ * TODO: add a `localStorage` variable to explicitly enable/disable colors
+ */
+
+function useColors() {
+  // NB: In an Electron preload script, document will be defined but not fully
+  // initialized. Since we know we're in Chrome, we'll just detect this case
+  // explicitly
+  if (typeof window !== 'undefined' && window && typeof window.process !== 'undefined' && window.process.type === 'renderer') {
+    return true;
+  }
+
+  // is webkit? http://stackoverflow.com/a/16459606/376773
+  // document is undefined in react-native: https://github.com/facebook/react-native/pull/1632
+  return (typeof document !== 'undefined' && document && 'WebkitAppearance' in document.documentElement.style) ||
+    // is firebug? http://stackoverflow.com/a/398120/376773
+    (typeof window !== 'undefined' && window && window.console && (console.firebug || (console.exception && console.table))) ||
+    // is firefox >= v31?
+    // https://developer.mozilla.org/en-US/docs/Tools/Web_Console#Styling_messages
+    (typeof navigator !== 'undefined' && navigator && navigator.userAgent && navigator.userAgent.toLowerCase().match(/firefox\/(\d+)/) && parseInt(RegExp.$1, 10) >= 31) ||
+    // double check webkit in userAgent just in case we are in a worker
+    (typeof navigator !== 'undefined' && navigator && navigator.userAgent && navigator.userAgent.toLowerCase().match(/applewebkit\/(\d+)/));
+}
+
+/**
+ * Map %j to `JSON.stringify()`, since no Web Inspectors do that by default.
+ */
+
+exports.formatters.j = function(v) {
+  try {
+    return JSON.stringify(v);
+  } catch (err) {
+    return '[UnexpectedJSONParseError]: ' + err.message;
+  }
+};
+
+
+/**
+ * Colorize log arguments if enabled.
+ *
+ * @api public
+ */
+
+function formatArgs(args) {
+  var useColors = this.useColors;
+
+  args[0] = (useColors ? '%c' : '')
+    + this.namespace
+    + (useColors ? ' %c' : ' ')
+    + args[0]
+    + (useColors ? '%c ' : ' ')
+    + '+' + exports.humanize(this.diff);
+
+  if (!useColors) return;
+
+  var c = 'color: ' + this.color;
+  args.splice(1, 0, c, 'color: inherit')
+
+  // the final "%c" is somewhat tricky, because there could be other
+  // arguments passed either before or after the %c, so we need to
+  // figure out the correct index to insert the CSS into
+  var index = 0;
+  var lastC = 0;
+  args[0].replace(/%[a-zA-Z%]/g, function(match) {
+    if ('%%' === match) return;
+    index++;
+    if ('%c' === match) {
+      // we only are interested in the *last* %c
+      // (the user may have provided their own)
+      lastC = index;
+    }
+  });
+
+  args.splice(lastC, 0, c);
+}
+
+/**
+ * Invokes `console.log()` when available.
+ * No-op when `console.log` is not a "function".
+ *
+ * @api public
+ */
+
+function log() {
+  // this hackery is required for IE8/9, where
+  // the `console.log` function doesn't have 'apply'
+  return 'object' === typeof console
+    && console.log
+    && Function.prototype.apply.call(console.log, console, arguments);
+}
+
+/**
+ * Save `namespaces`.
+ *
+ * @param {String} namespaces
+ * @api private
+ */
+
+function save(namespaces) {
+  try {
+    if (null == namespaces) {
+      exports.storage.removeItem('debug');
+    } else {
+      exports.storage.debug = namespaces;
+    }
+  } catch(e) {}
+}
+
+/**
+ * Load `namespaces`.
+ *
+ * @return {String} returns the previously persisted debug modes
+ * @api private
+ */
+
+function load() {
+  try {
+    return exports.storage.debug;
+  } catch(e) {}
+
+  // If debug isn't set in LS, and we're in Electron, try to load $DEBUG
+  if (typeof process !== 'undefined' && 'env' in process) {
+    return process.env.DEBUG;
+  }
+}
+
+/**
+ * Enable namespaces listed in `localStorage.debug` initially.
+ */
+
+exports.enable(load());
+
+/**
+ * Localstorage attempts to return the localstorage.
+ *
+ * This is necessary because safari throws
+ * when a user disables cookies/localstorage
+ * and you attempt to access it.
+ *
+ * @return {LocalStorage}
+ * @api private
+ */
+
+function localstorage() {
+  try {
+    return window.localStorage;
+  } catch (e) {}
+}
+
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(44)))
+
+/***/ }),
+/* 27 */
+/***/ (function(module, exports, __webpack_require__) {
+
+var _curry2 = __webpack_require__(0);
+var _isFunction = __webpack_require__(18);
+var and = __webpack_require__(45);
+var lift = __webpack_require__(23);
+
+
+/**
+ * A function which calls the two provided functions and returns the `&&`
+ * of the results.
+ * It returns the result of the first function if it is false-y and the result
+ * of the second function otherwise. Note that this is short-circuited,
+ * meaning that the second function will not be invoked if the first returns a
+ * false-y value.
+ *
+ * In addition to functions, `R.both` also accepts any fantasy-land compatible
+ * applicative functor.
+ *
+ * @func
+ * @memberOf R
+ * @since v0.12.0
+ * @category Logic
+ * @sig (*... -> Boolean) -> (*... -> Boolean) -> (*... -> Boolean)
+ * @param {Function} f A predicate
+ * @param {Function} g Another predicate
+ * @return {Function} a function that applies its arguments to `f` and `g` and `&&`s their outputs together.
+ * @see R.and
+ * @example
+ *
+ *      var gt10 = R.gt(R.__, 10)
+ *      var lt20 = R.lt(R.__, 20)
+ *      var f = R.both(gt10, lt20);
+ *      f(15); //=> true
+ *      f(30); //=> false
+ */
+module.exports = _curry2(function both(f, g) {
+  return _isFunction(f) ?
+    function _both() {
+      return f.apply(this, arguments) && g.apply(this, arguments);
+    } :
+    lift(and)(f, g);
+});
+
+
+/***/ }),
+/* 28 */
+/***/ (function(module, exports, __webpack_require__) {
+
+var lift = __webpack_require__(23);
+var not = __webpack_require__(71);
+
+
+/**
+ * Takes a function `f` and returns a function `g` such that if called with the same arguments
+ * when `f` returns a "truthy" value, `g` returns `false` and when `f` returns a "falsy" value `g` returns `true`.
+ *
+ * `R.complement` may be applied to any functor
+ *
+ * @func
+ * @memberOf R
+ * @since v0.12.0
+ * @category Logic
+ * @sig (*... -> *) -> (*... -> Boolean)
+ * @param {Function} f
+ * @return {Function}
+ * @see R.not
+ * @example
+ *
+ *      var isNotNil = R.complement(R.isNil);
+ *      isNil(null); //=> true
+ *      isNotNil(null); //=> false
+ *      isNil(7); //=> false
+ *      isNotNil(7); //=> true
+ */
+module.exports = lift(not);
+
+
+/***/ }),
+/* 29 */
+/***/ (function(module, exports, __webpack_require__) {
+
+var pipe = __webpack_require__(72);
+var reverse = __webpack_require__(74);
+
+
+/**
+ * Performs right-to-left function composition. The rightmost function may have
+ * any arity; the remaining functions must be unary.
+ *
+ * **Note:** The result of compose is not automatically curried.
+ *
+ * @func
+ * @memberOf R
+ * @since v0.1.0
+ * @category Function
+ * @sig ((y -> z), (x -> y), ..., (o -> p), ((a, b, ..., n) -> o)) -> ((a, b, ..., n) -> z)
+ * @param {...Function} ...functions The functions to compose
+ * @return {Function}
+ * @see R.pipe
+ * @example
+ *
+ *      var classyGreeting = (firstName, lastName) => "The name's " + lastName + ", " + firstName + " " + lastName
+ *      var yellGreeting = R.compose(R.toUpper, classyGreeting);
+ *      yellGreeting('James', 'Bond'); //=> "THE NAME'S BOND, JAMES BOND"
+ *
+ *      R.compose(Math.abs, R.add(1), R.multiply(2))(-4) //=> 7
+ *
+ * @symb R.compose(f, g, h)(a, b) = f(g(h(a, b)))
+ */
+module.exports = function compose() {
+  if (arguments.length === 0) {
+    throw new Error('compose requires at least one argument');
+  }
+  return pipe.apply(this, reverse(arguments));
+};
+
+
+/***/ }),
+/* 30 */
+/***/ (function(module, exports, __webpack_require__) {
+
+var _curry1 = __webpack_require__(1);
+var curryN = __webpack_require__(3);
+
+
+/**
+ * Returns a curried equivalent of the provided function. The curried function
+ * has two unusual capabilities. First, its arguments needn't be provided one
+ * at a time. If `f` is a ternary function and `g` is `R.curry(f)`, the
+ * following are equivalent:
+ *
+ *   - `g(1)(2)(3)`
+ *   - `g(1)(2, 3)`
+ *   - `g(1, 2)(3)`
+ *   - `g(1, 2, 3)`
+ *
+ * Secondly, the special placeholder value `R.__` may be used to specify
+ * "gaps", allowing partial application of any combination of arguments,
+ * regardless of their positions. If `g` is as above and `_` is `R.__`, the
+ * following are equivalent:
+ *
+ *   - `g(1, 2, 3)`
+ *   - `g(_, 2, 3)(1)`
+ *   - `g(_, _, 3)(1)(2)`
+ *   - `g(_, _, 3)(1, 2)`
+ *   - `g(_, 2)(1)(3)`
+ *   - `g(_, 2)(1, 3)`
+ *   - `g(_, 2)(_, 3)(1)`
+ *
+ * @func
+ * @memberOf R
+ * @since v0.1.0
+ * @category Function
+ * @sig (* -> a) -> (* -> a)
+ * @param {Function} fn The function to curry.
+ * @return {Function} A new, curried function.
+ * @see R.curryN
+ * @example
+ *
+ *      var addFourNumbers = (a, b, c, d) => a + b + c + d;
+ *
+ *      var curriedAddFourNumbers = R.curry(addFourNumbers);
+ *      var f = curriedAddFourNumbers(1, 2);
+ *      var g = f(3);
+ *      g(4); //=> 10
+ */
+module.exports = _curry1(function curry(fn) {
+  return curryN(fn.length, fn);
+});
+
+
+/***/ }),
+/* 31 */
+/***/ (function(module, exports, __webpack_require__) {
+
+var nth = __webpack_require__(24);
+
+
+/**
+ * Returns the first element of the given list or string. In some libraries
+ * this function is named `first`.
+ *
+ * @func
+ * @memberOf R
+ * @since v0.1.0
+ * @category List
+ * @sig [a] -> a | Undefined
+ * @sig String -> String
+ * @param {Array|String} list
+ * @return {*}
+ * @see R.tail, R.init, R.last
+ * @example
+ *
+ *      R.head(['fi', 'fo', 'fum']); //=> 'fi'
+ *      R.head([]); //=> undefined
+ *
+ *      R.head('abc'); //=> 'a'
+ *      R.head(''); //=> ''
+ */
+module.exports = nth(0);
+
+
+/***/ }),
+/* 32 */
+/***/ (function(module, exports, __webpack_require__) {
+
+var _curry1 = __webpack_require__(1);
+var empty = __webpack_require__(48);
+var equals = __webpack_require__(13);
+
+
+/**
+ * Returns `true` if the given value is its type's empty value; `false`
+ * otherwise.
+ *
+ * @func
+ * @memberOf R
+ * @since v0.1.0
+ * @category Logic
+ * @sig a -> Boolean
+ * @param {*} x
+ * @return {Boolean}
+ * @see R.empty
+ * @example
+ *
+ *      R.isEmpty([1, 2, 3]);   //=> false
+ *      R.isEmpty([]);          //=> true
+ *      R.isEmpty('');          //=> true
+ *      R.isEmpty(null);        //=> false
+ *      R.isEmpty({});          //=> true
+ *      R.isEmpty({length: 0}); //=> false
+ */
+module.exports = _curry1(function isEmpty(x) {
+  return x != null && equals(x, empty(x));
+});
+
+
+/***/ }),
+/* 33 */
+/***/ (function(module, exports, __webpack_require__) {
+
+var invoker = __webpack_require__(22);
+
+
+/**
+ * Returns a string made by inserting the `separator` between each element and
+ * concatenating all the elements into a single string.
+ *
+ * @func
+ * @memberOf R
+ * @since v0.1.0
+ * @category List
+ * @sig String -> [a] -> String
+ * @param {Number|String} separator The string used to separate the elements.
+ * @param {Array} xs The elements to join into a string.
+ * @return {String} str The string made by concatenating `xs` with `separator`.
+ * @see R.split
+ * @example
+ *
+ *      var spacer = R.join(' ');
+ *      spacer(['a', 2, 3.4]);   //=> 'a 2 3.4'
+ *      R.join('|', [1, 2, 3]);    //=> '1|2|3'
+ */
+module.exports = invoker(1, 'join');
+
+
+/***/ }),
+/* 34 */
+/***/ (function(module, exports, __webpack_require__) {
+
+var nth = __webpack_require__(24);
+
+
+/**
+ * Returns the last element of the given list or string.
+ *
+ * @func
+ * @memberOf R
+ * @since v0.1.4
+ * @category List
+ * @sig [a] -> a | Undefined
+ * @sig String -> String
+ * @param {*} list
+ * @return {*}
+ * @see R.init, R.head, R.tail
+ * @example
+ *
+ *      R.last(['fi', 'fo', 'fum']); //=> 'fum'
+ *      R.last([]); //=> undefined
+ *
+ *      R.last('abc'); //=> 'c'
+ *      R.last(''); //=> ''
+ */
+module.exports = nth(-1);
+
+
+/***/ }),
+/* 35 */
+/***/ (function(module, exports, __webpack_require__) {
+
+var _curry2 = __webpack_require__(0);
+
+
+/**
+ * Tests a regular expression against a String. Note that this function will
+ * return an empty array when there are no matches. This differs from
+ * [`String.prototype.match`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String/match)
+ * which returns `null` when there are no matches.
+ *
+ * @func
+ * @memberOf R
+ * @since v0.1.0
+ * @category String
+ * @sig RegExp -> String -> [String | Undefined]
+ * @param {RegExp} rx A regular expression.
+ * @param {String} str The string to match against
+ * @return {Array} The list of matches or empty array.
+ * @see R.test
+ * @example
+ *
+ *      R.match(/([a-z]a)/g, 'bananas'); //=> ['ba', 'na', 'na']
+ *      R.match(/a/, 'b'); //=> []
+ *      R.match(/a/, null); //=> TypeError: null does not have a method named "match"
+ */
+module.exports = _curry2(function match(rx, str) {
+  return str.match(rx) || [];
+});
+
+
+/***/ }),
+/* 36 */
+/***/ (function(module, exports, __webpack_require__) {
+
+var _curry2 = __webpack_require__(0);
+
+
+/**
+ * Returns the smaller of its two arguments.
+ *
+ * @func
+ * @memberOf R
+ * @since v0.1.0
+ * @category Relation
+ * @sig Ord a => a -> a -> a
+ * @param {*} a
+ * @param {*} b
+ * @return {*}
+ * @see R.minBy, R.max
+ * @example
+ *
+ *      R.min(789, 123); //=> 123
+ *      R.min('a', 'b'); //=> 'a'
+ */
+module.exports = _curry2(function min(a, b) { return b < a ? b : a; });
+
+
+/***/ }),
+/* 37 */
+/***/ (function(module, exports, __webpack_require__) {
+
+var _curry2 = __webpack_require__(0);
+
+
+/**
+ * Returns a function that when supplied an object returns the indicated
+ * property of that object, if it exists.
+ *
+ * @func
+ * @memberOf R
+ * @since v0.1.0
+ * @category Object
+ * @sig s -> {s: a} -> a | Undefined
+ * @param {String} p The property name
+ * @param {Object} obj The object to query
+ * @return {*} The value at `obj.p`.
+ * @see R.path
+ * @example
+ *
+ *      R.prop('x', {x: 100}); //=> 100
+ *      R.prop('x', {}); //=> undefined
+ */
+module.exports = _curry2(function prop(p, obj) { return obj[p]; });
+
+
+/***/ }),
+/* 38 */
+/***/ (function(module, exports, __webpack_require__) {
+
+var invoker = __webpack_require__(22);
+
+
+/**
+ * Splits a string into an array of strings based on the given
+ * separator.
+ *
+ * @func
+ * @memberOf R
+ * @since v0.1.0
+ * @category String
+ * @sig (String | RegExp) -> String -> [String]
+ * @param {String|RegExp} sep The pattern.
+ * @param {String} str The string to separate into an array.
+ * @return {Array} The array of strings from `str` separated by `str`.
+ * @see R.join
+ * @example
+ *
+ *      var pathComponents = R.split('/');
+ *      R.tail(pathComponents('/usr/local/bin/node')); //=> ['usr', 'local', 'bin', 'node']
+ *
+ *      R.split('.', 'a.b.c.xyz.d'); //=> ['a', 'b', 'c', 'xyz', 'd']
+ */
+module.exports = invoker(1, 'split');
+
+
+/***/ }),
+/* 39 */
+/***/ (function(module, exports, __webpack_require__) {
+
+var _curry2 = __webpack_require__(0);
+
+
+/**
+ * Runs the given function with the supplied object, then returns the object.
+ *
+ * @func
+ * @memberOf R
+ * @since v0.1.0
+ * @category Function
+ * @sig (a -> *) -> a -> a
+ * @param {Function} fn The function to call with `x`. The return value of `fn` will be thrown away.
+ * @param {*} x
+ * @return {*} `x`.
+ * @example
+ *
+ *      var sayX = x => console.log('x is ' + x);
+ *      R.tap(sayX, 100); //=> 100
+ *      // logs 'x is 100'
+ * @symb R.tap(f, a) = a
+ */
+module.exports = _curry2(function tap(fn, x) {
+  fn(x);
+  return x;
+});
+
+
+/***/ }),
+/* 40 */
+/***/ (function(module, exports, __webpack_require__) {
+
+var _cloneRegExp = __webpack_require__(51);
+var _curry2 = __webpack_require__(0);
+var _isRegExp = __webpack_require__(60);
+var toString = __webpack_require__(25);
+
+
+/**
+ * Determines whether a given string matches a given regular expression.
+ *
+ * @func
+ * @memberOf R
+ * @since v0.12.0
+ * @category String
+ * @sig RegExp -> String -> Boolean
+ * @param {RegExp} pattern
+ * @param {String} str
+ * @return {Boolean}
+ * @see R.match
+ * @example
+ *
+ *      R.test(/^x/, 'xyz'); //=> true
+ *      R.test(/^y/, 'xyz'); //=> false
+ */
+module.exports = _curry2(function test(pattern, str) {
+  if (!_isRegExp(pattern)) {
+    throw new TypeError('‘test’ requires a value of type RegExp as its first argument; received ' + toString(pattern));
+  }
+  return _cloneRegExp(pattern).test(str);
+});
+
+
+/***/ }),
+/* 41 */
+/***/ (function(module, exports, __webpack_require__) {
+
 (function webpackUniversalModuleDefinition(root, factory) {
 	if(true)
 		module.exports = factory();
@@ -1541,7 +2213,9 @@ var IO = function IO(f) {
       });
     },
     ap: function ap(io) {
-      return io.map(f()); // Does this work??
+      return IO(function () {
+        return io.map(f()); // Does this work??
+      });
     },
     fold: function fold(left, right) {
       return __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_1__Either_js__["tryCatch"])(f).fold(left, right);
@@ -2173,678 +2847,6 @@ Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
 /***/ })
 /******/ ]);
 });
-
-/***/ }),
-/* 27 */
-/***/ (function(module, exports, __webpack_require__) {
-
-/* WEBPACK VAR INJECTION */(function(process) {/**
- * This is the web browser implementation of `debug()`.
- *
- * Expose `debug()` as the module.
- */
-
-exports = module.exports = __webpack_require__(42);
-exports.log = log;
-exports.formatArgs = formatArgs;
-exports.save = save;
-exports.load = load;
-exports.useColors = useColors;
-exports.storage = 'undefined' != typeof chrome
-               && 'undefined' != typeof chrome.storage
-                  ? chrome.storage.local
-                  : localstorage();
-
-/**
- * Colors.
- */
-
-exports.colors = [
-  'lightseagreen',
-  'forestgreen',
-  'goldenrod',
-  'dodgerblue',
-  'darkorchid',
-  'crimson'
-];
-
-/**
- * Currently only WebKit-based Web Inspectors, Firefox >= v31,
- * and the Firebug extension (any Firefox version) are known
- * to support "%c" CSS customizations.
- *
- * TODO: add a `localStorage` variable to explicitly enable/disable colors
- */
-
-function useColors() {
-  // NB: In an Electron preload script, document will be defined but not fully
-  // initialized. Since we know we're in Chrome, we'll just detect this case
-  // explicitly
-  if (typeof window !== 'undefined' && window && typeof window.process !== 'undefined' && window.process.type === 'renderer') {
-    return true;
-  }
-
-  // is webkit? http://stackoverflow.com/a/16459606/376773
-  // document is undefined in react-native: https://github.com/facebook/react-native/pull/1632
-  return (typeof document !== 'undefined' && document && 'WebkitAppearance' in document.documentElement.style) ||
-    // is firebug? http://stackoverflow.com/a/398120/376773
-    (typeof window !== 'undefined' && window && window.console && (console.firebug || (console.exception && console.table))) ||
-    // is firefox >= v31?
-    // https://developer.mozilla.org/en-US/docs/Tools/Web_Console#Styling_messages
-    (typeof navigator !== 'undefined' && navigator && navigator.userAgent && navigator.userAgent.toLowerCase().match(/firefox\/(\d+)/) && parseInt(RegExp.$1, 10) >= 31) ||
-    // double check webkit in userAgent just in case we are in a worker
-    (typeof navigator !== 'undefined' && navigator && navigator.userAgent && navigator.userAgent.toLowerCase().match(/applewebkit\/(\d+)/));
-}
-
-/**
- * Map %j to `JSON.stringify()`, since no Web Inspectors do that by default.
- */
-
-exports.formatters.j = function(v) {
-  try {
-    return JSON.stringify(v);
-  } catch (err) {
-    return '[UnexpectedJSONParseError]: ' + err.message;
-  }
-};
-
-
-/**
- * Colorize log arguments if enabled.
- *
- * @api public
- */
-
-function formatArgs(args) {
-  var useColors = this.useColors;
-
-  args[0] = (useColors ? '%c' : '')
-    + this.namespace
-    + (useColors ? ' %c' : ' ')
-    + args[0]
-    + (useColors ? '%c ' : ' ')
-    + '+' + exports.humanize(this.diff);
-
-  if (!useColors) return;
-
-  var c = 'color: ' + this.color;
-  args.splice(1, 0, c, 'color: inherit')
-
-  // the final "%c" is somewhat tricky, because there could be other
-  // arguments passed either before or after the %c, so we need to
-  // figure out the correct index to insert the CSS into
-  var index = 0;
-  var lastC = 0;
-  args[0].replace(/%[a-zA-Z%]/g, function(match) {
-    if ('%%' === match) return;
-    index++;
-    if ('%c' === match) {
-      // we only are interested in the *last* %c
-      // (the user may have provided their own)
-      lastC = index;
-    }
-  });
-
-  args.splice(lastC, 0, c);
-}
-
-/**
- * Invokes `console.log()` when available.
- * No-op when `console.log` is not a "function".
- *
- * @api public
- */
-
-function log() {
-  // this hackery is required for IE8/9, where
-  // the `console.log` function doesn't have 'apply'
-  return 'object' === typeof console
-    && console.log
-    && Function.prototype.apply.call(console.log, console, arguments);
-}
-
-/**
- * Save `namespaces`.
- *
- * @param {String} namespaces
- * @api private
- */
-
-function save(namespaces) {
-  try {
-    if (null == namespaces) {
-      exports.storage.removeItem('debug');
-    } else {
-      exports.storage.debug = namespaces;
-    }
-  } catch(e) {}
-}
-
-/**
- * Load `namespaces`.
- *
- * @return {String} returns the previously persisted debug modes
- * @api private
- */
-
-function load() {
-  try {
-    return exports.storage.debug;
-  } catch(e) {}
-
-  // If debug isn't set in LS, and we're in Electron, try to load $DEBUG
-  if (typeof process !== 'undefined' && 'env' in process) {
-    return process.env.DEBUG;
-  }
-}
-
-/**
- * Enable namespaces listed in `localStorage.debug` initially.
- */
-
-exports.enable(load());
-
-/**
- * Localstorage attempts to return the localstorage.
- *
- * This is necessary because safari throws
- * when a user disables cookies/localstorage
- * and you attempt to access it.
- *
- * @return {LocalStorage}
- * @api private
- */
-
-function localstorage() {
-  try {
-    return window.localStorage;
-  } catch (e) {}
-}
-
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(44)))
-
-/***/ }),
-/* 28 */
-/***/ (function(module, exports, __webpack_require__) {
-
-var _curry2 = __webpack_require__(0);
-var _isFunction = __webpack_require__(18);
-var and = __webpack_require__(45);
-var lift = __webpack_require__(23);
-
-
-/**
- * A function which calls the two provided functions and returns the `&&`
- * of the results.
- * It returns the result of the first function if it is false-y and the result
- * of the second function otherwise. Note that this is short-circuited,
- * meaning that the second function will not be invoked if the first returns a
- * false-y value.
- *
- * In addition to functions, `R.both` also accepts any fantasy-land compatible
- * applicative functor.
- *
- * @func
- * @memberOf R
- * @since v0.12.0
- * @category Logic
- * @sig (*... -> Boolean) -> (*... -> Boolean) -> (*... -> Boolean)
- * @param {Function} f A predicate
- * @param {Function} g Another predicate
- * @return {Function} a function that applies its arguments to `f` and `g` and `&&`s their outputs together.
- * @see R.and
- * @example
- *
- *      var gt10 = R.gt(R.__, 10)
- *      var lt20 = R.lt(R.__, 20)
- *      var f = R.both(gt10, lt20);
- *      f(15); //=> true
- *      f(30); //=> false
- */
-module.exports = _curry2(function both(f, g) {
-  return _isFunction(f) ?
-    function _both() {
-      return f.apply(this, arguments) && g.apply(this, arguments);
-    } :
-    lift(and)(f, g);
-});
-
-
-/***/ }),
-/* 29 */
-/***/ (function(module, exports, __webpack_require__) {
-
-var lift = __webpack_require__(23);
-var not = __webpack_require__(71);
-
-
-/**
- * Takes a function `f` and returns a function `g` such that if called with the same arguments
- * when `f` returns a "truthy" value, `g` returns `false` and when `f` returns a "falsy" value `g` returns `true`.
- *
- * `R.complement` may be applied to any functor
- *
- * @func
- * @memberOf R
- * @since v0.12.0
- * @category Logic
- * @sig (*... -> *) -> (*... -> Boolean)
- * @param {Function} f
- * @return {Function}
- * @see R.not
- * @example
- *
- *      var isNotNil = R.complement(R.isNil);
- *      isNil(null); //=> true
- *      isNotNil(null); //=> false
- *      isNil(7); //=> false
- *      isNotNil(7); //=> true
- */
-module.exports = lift(not);
-
-
-/***/ }),
-/* 30 */
-/***/ (function(module, exports, __webpack_require__) {
-
-var pipe = __webpack_require__(72);
-var reverse = __webpack_require__(74);
-
-
-/**
- * Performs right-to-left function composition. The rightmost function may have
- * any arity; the remaining functions must be unary.
- *
- * **Note:** The result of compose is not automatically curried.
- *
- * @func
- * @memberOf R
- * @since v0.1.0
- * @category Function
- * @sig ((y -> z), (x -> y), ..., (o -> p), ((a, b, ..., n) -> o)) -> ((a, b, ..., n) -> z)
- * @param {...Function} ...functions The functions to compose
- * @return {Function}
- * @see R.pipe
- * @example
- *
- *      var classyGreeting = (firstName, lastName) => "The name's " + lastName + ", " + firstName + " " + lastName
- *      var yellGreeting = R.compose(R.toUpper, classyGreeting);
- *      yellGreeting('James', 'Bond'); //=> "THE NAME'S BOND, JAMES BOND"
- *
- *      R.compose(Math.abs, R.add(1), R.multiply(2))(-4) //=> 7
- *
- * @symb R.compose(f, g, h)(a, b) = f(g(h(a, b)))
- */
-module.exports = function compose() {
-  if (arguments.length === 0) {
-    throw new Error('compose requires at least one argument');
-  }
-  return pipe.apply(this, reverse(arguments));
-};
-
-
-/***/ }),
-/* 31 */
-/***/ (function(module, exports, __webpack_require__) {
-
-var _curry1 = __webpack_require__(1);
-var curryN = __webpack_require__(3);
-
-
-/**
- * Returns a curried equivalent of the provided function. The curried function
- * has two unusual capabilities. First, its arguments needn't be provided one
- * at a time. If `f` is a ternary function and `g` is `R.curry(f)`, the
- * following are equivalent:
- *
- *   - `g(1)(2)(3)`
- *   - `g(1)(2, 3)`
- *   - `g(1, 2)(3)`
- *   - `g(1, 2, 3)`
- *
- * Secondly, the special placeholder value `R.__` may be used to specify
- * "gaps", allowing partial application of any combination of arguments,
- * regardless of their positions. If `g` is as above and `_` is `R.__`, the
- * following are equivalent:
- *
- *   - `g(1, 2, 3)`
- *   - `g(_, 2, 3)(1)`
- *   - `g(_, _, 3)(1)(2)`
- *   - `g(_, _, 3)(1, 2)`
- *   - `g(_, 2)(1)(3)`
- *   - `g(_, 2)(1, 3)`
- *   - `g(_, 2)(_, 3)(1)`
- *
- * @func
- * @memberOf R
- * @since v0.1.0
- * @category Function
- * @sig (* -> a) -> (* -> a)
- * @param {Function} fn The function to curry.
- * @return {Function} A new, curried function.
- * @see R.curryN
- * @example
- *
- *      var addFourNumbers = (a, b, c, d) => a + b + c + d;
- *
- *      var curriedAddFourNumbers = R.curry(addFourNumbers);
- *      var f = curriedAddFourNumbers(1, 2);
- *      var g = f(3);
- *      g(4); //=> 10
- */
-module.exports = _curry1(function curry(fn) {
-  return curryN(fn.length, fn);
-});
-
-
-/***/ }),
-/* 32 */
-/***/ (function(module, exports, __webpack_require__) {
-
-var nth = __webpack_require__(24);
-
-
-/**
- * Returns the first element of the given list or string. In some libraries
- * this function is named `first`.
- *
- * @func
- * @memberOf R
- * @since v0.1.0
- * @category List
- * @sig [a] -> a | Undefined
- * @sig String -> String
- * @param {Array|String} list
- * @return {*}
- * @see R.tail, R.init, R.last
- * @example
- *
- *      R.head(['fi', 'fo', 'fum']); //=> 'fi'
- *      R.head([]); //=> undefined
- *
- *      R.head('abc'); //=> 'a'
- *      R.head(''); //=> ''
- */
-module.exports = nth(0);
-
-
-/***/ }),
-/* 33 */
-/***/ (function(module, exports, __webpack_require__) {
-
-var _curry1 = __webpack_require__(1);
-var empty = __webpack_require__(48);
-var equals = __webpack_require__(13);
-
-
-/**
- * Returns `true` if the given value is its type's empty value; `false`
- * otherwise.
- *
- * @func
- * @memberOf R
- * @since v0.1.0
- * @category Logic
- * @sig a -> Boolean
- * @param {*} x
- * @return {Boolean}
- * @see R.empty
- * @example
- *
- *      R.isEmpty([1, 2, 3]);   //=> false
- *      R.isEmpty([]);          //=> true
- *      R.isEmpty('');          //=> true
- *      R.isEmpty(null);        //=> false
- *      R.isEmpty({});          //=> true
- *      R.isEmpty({length: 0}); //=> false
- */
-module.exports = _curry1(function isEmpty(x) {
-  return x != null && equals(x, empty(x));
-});
-
-
-/***/ }),
-/* 34 */
-/***/ (function(module, exports, __webpack_require__) {
-
-var invoker = __webpack_require__(22);
-
-
-/**
- * Returns a string made by inserting the `separator` between each element and
- * concatenating all the elements into a single string.
- *
- * @func
- * @memberOf R
- * @since v0.1.0
- * @category List
- * @sig String -> [a] -> String
- * @param {Number|String} separator The string used to separate the elements.
- * @param {Array} xs The elements to join into a string.
- * @return {String} str The string made by concatenating `xs` with `separator`.
- * @see R.split
- * @example
- *
- *      var spacer = R.join(' ');
- *      spacer(['a', 2, 3.4]);   //=> 'a 2 3.4'
- *      R.join('|', [1, 2, 3]);    //=> '1|2|3'
- */
-module.exports = invoker(1, 'join');
-
-
-/***/ }),
-/* 35 */
-/***/ (function(module, exports, __webpack_require__) {
-
-var nth = __webpack_require__(24);
-
-
-/**
- * Returns the last element of the given list or string.
- *
- * @func
- * @memberOf R
- * @since v0.1.4
- * @category List
- * @sig [a] -> a | Undefined
- * @sig String -> String
- * @param {*} list
- * @return {*}
- * @see R.init, R.head, R.tail
- * @example
- *
- *      R.last(['fi', 'fo', 'fum']); //=> 'fum'
- *      R.last([]); //=> undefined
- *
- *      R.last('abc'); //=> 'c'
- *      R.last(''); //=> ''
- */
-module.exports = nth(-1);
-
-
-/***/ }),
-/* 36 */
-/***/ (function(module, exports, __webpack_require__) {
-
-var _curry2 = __webpack_require__(0);
-
-
-/**
- * Tests a regular expression against a String. Note that this function will
- * return an empty array when there are no matches. This differs from
- * [`String.prototype.match`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String/match)
- * which returns `null` when there are no matches.
- *
- * @func
- * @memberOf R
- * @since v0.1.0
- * @category String
- * @sig RegExp -> String -> [String | Undefined]
- * @param {RegExp} rx A regular expression.
- * @param {String} str The string to match against
- * @return {Array} The list of matches or empty array.
- * @see R.test
- * @example
- *
- *      R.match(/([a-z]a)/g, 'bananas'); //=> ['ba', 'na', 'na']
- *      R.match(/a/, 'b'); //=> []
- *      R.match(/a/, null); //=> TypeError: null does not have a method named "match"
- */
-module.exports = _curry2(function match(rx, str) {
-  return str.match(rx) || [];
-});
-
-
-/***/ }),
-/* 37 */
-/***/ (function(module, exports, __webpack_require__) {
-
-var _curry2 = __webpack_require__(0);
-
-
-/**
- * Returns the smaller of its two arguments.
- *
- * @func
- * @memberOf R
- * @since v0.1.0
- * @category Relation
- * @sig Ord a => a -> a -> a
- * @param {*} a
- * @param {*} b
- * @return {*}
- * @see R.minBy, R.max
- * @example
- *
- *      R.min(789, 123); //=> 123
- *      R.min('a', 'b'); //=> 'a'
- */
-module.exports = _curry2(function min(a, b) { return b < a ? b : a; });
-
-
-/***/ }),
-/* 38 */
-/***/ (function(module, exports, __webpack_require__) {
-
-var _curry2 = __webpack_require__(0);
-
-
-/**
- * Returns a function that when supplied an object returns the indicated
- * property of that object, if it exists.
- *
- * @func
- * @memberOf R
- * @since v0.1.0
- * @category Object
- * @sig s -> {s: a} -> a | Undefined
- * @param {String} p The property name
- * @param {Object} obj The object to query
- * @return {*} The value at `obj.p`.
- * @see R.path
- * @example
- *
- *      R.prop('x', {x: 100}); //=> 100
- *      R.prop('x', {}); //=> undefined
- */
-module.exports = _curry2(function prop(p, obj) { return obj[p]; });
-
-
-/***/ }),
-/* 39 */
-/***/ (function(module, exports, __webpack_require__) {
-
-var invoker = __webpack_require__(22);
-
-
-/**
- * Splits a string into an array of strings based on the given
- * separator.
- *
- * @func
- * @memberOf R
- * @since v0.1.0
- * @category String
- * @sig (String | RegExp) -> String -> [String]
- * @param {String|RegExp} sep The pattern.
- * @param {String} str The string to separate into an array.
- * @return {Array} The array of strings from `str` separated by `str`.
- * @see R.join
- * @example
- *
- *      var pathComponents = R.split('/');
- *      R.tail(pathComponents('/usr/local/bin/node')); //=> ['usr', 'local', 'bin', 'node']
- *
- *      R.split('.', 'a.b.c.xyz.d'); //=> ['a', 'b', 'c', 'xyz', 'd']
- */
-module.exports = invoker(1, 'split');
-
-
-/***/ }),
-/* 40 */
-/***/ (function(module, exports, __webpack_require__) {
-
-var _curry2 = __webpack_require__(0);
-
-
-/**
- * Runs the given function with the supplied object, then returns the object.
- *
- * @func
- * @memberOf R
- * @since v0.1.0
- * @category Function
- * @sig (a -> *) -> a -> a
- * @param {Function} fn The function to call with `x`. The return value of `fn` will be thrown away.
- * @param {*} x
- * @return {*} `x`.
- * @example
- *
- *      var sayX = x => console.log('x is ' + x);
- *      R.tap(sayX, 100); //=> 100
- *      // logs 'x is 100'
- * @symb R.tap(f, a) = a
- */
-module.exports = _curry2(function tap(fn, x) {
-  fn(x);
-  return x;
-});
-
-
-/***/ }),
-/* 41 */
-/***/ (function(module, exports, __webpack_require__) {
-
-var _cloneRegExp = __webpack_require__(51);
-var _curry2 = __webpack_require__(0);
-var _isRegExp = __webpack_require__(60);
-var toString = __webpack_require__(25);
-
-
-/**
- * Determines whether a given string matches a given regular expression.
- *
- * @func
- * @memberOf R
- * @since v0.12.0
- * @category String
- * @sig RegExp -> String -> Boolean
- * @param {RegExp} pattern
- * @param {String} str
- * @return {Boolean}
- * @see R.match
- * @example
- *
- *      R.test(/^x/, 'xyz'); //=> true
- *      R.test(/^y/, 'xyz'); //=> false
- */
-module.exports = _curry2(function test(pattern, str) {
-  if (!_isRegExp(pattern)) {
-    throw new TypeError('‘test’ requires a value of type RegExp as its first argument; received ' + toString(pattern));
-  }
-  return _cloneRegExp(pattern).test(str);
-});
-
 
 /***/ }),
 /* 42 */
@@ -4478,43 +4480,43 @@ module.exports = _curry1(function type(val) {
 
 "use strict";
 Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0_ramda_src_complement__ = __webpack_require__(29);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0_ramda_src_complement__ = __webpack_require__(28);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0_ramda_src_complement___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_0_ramda_src_complement__);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1_ramda_src_isEmpty__ = __webpack_require__(33);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1_ramda_src_isEmpty__ = __webpack_require__(32);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_1_ramda_src_isEmpty___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_1_ramda_src_isEmpty__);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2_ramda_src_test__ = __webpack_require__(41);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2_ramda_src_test__ = __webpack_require__(40);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_2_ramda_src_test___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_2_ramda_src_test__);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3_ramda_src_compose__ = __webpack_require__(30);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3_ramda_src_compose__ = __webpack_require__(29);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_3_ramda_src_compose___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_3_ramda_src_compose__);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_4_ramda_src_split__ = __webpack_require__(39);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_4_ramda_src_split__ = __webpack_require__(38);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_4_ramda_src_split___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_4_ramda_src_split__);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_5_ramda_src_filter__ = __webpack_require__(11);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_5_ramda_src_filter___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_5_ramda_src_filter__);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_6_ramda_src_curry__ = __webpack_require__(31);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_6_ramda_src_curry__ = __webpack_require__(30);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_6_ramda_src_curry___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_6_ramda_src_curry__);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_7_ramda_src_join__ = __webpack_require__(34);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_7_ramda_src_join__ = __webpack_require__(33);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_7_ramda_src_join___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_7_ramda_src_join__);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_8_ramda_src_tap__ = __webpack_require__(40);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_8_ramda_src_tap__ = __webpack_require__(39);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_8_ramda_src_tap___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_8_ramda_src_tap__);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_9_ramda_src_map__ = __webpack_require__(9);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_9_ramda_src_map___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_9_ramda_src_map__);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_10_ramda_src_prop__ = __webpack_require__(38);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_10_ramda_src_prop__ = __webpack_require__(37);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_10_ramda_src_prop___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_10_ramda_src_prop__);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_11_ramda_src_match__ = __webpack_require__(36);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_11_ramda_src_match__ = __webpack_require__(35);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_11_ramda_src_match___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_11_ramda_src_match__);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_12_ramda_src_reduce__ = __webpack_require__(12);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_12_ramda_src_reduce___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_12_ramda_src_reduce__);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_13_ramda_src_min__ = __webpack_require__(37);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_13_ramda_src_min__ = __webpack_require__(36);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_13_ramda_src_min___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_13_ramda_src_min__);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_14_ramda_src_both__ = __webpack_require__(28);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_14_ramda_src_both__ = __webpack_require__(27);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_14_ramda_src_both___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_14_ramda_src_both__);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_15_ramda_src_head__ = __webpack_require__(32);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_15_ramda_src_head__ = __webpack_require__(31);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_15_ramda_src_head___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_15_ramda_src_head__);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_16_ramda_src_last__ = __webpack_require__(35);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_16_ramda_src_last__ = __webpack_require__(34);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_16_ramda_src_last___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_16_ramda_src_last__);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_17_shirt__ = __webpack_require__(26);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_17_shirt__ = __webpack_require__(41);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_17_shirt___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_17_shirt__);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_18_debug__ = __webpack_require__(27);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_18_debug__ = __webpack_require__(26);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_18_debug___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_18_debug__);
 /* harmony export (immutable) */ __webpack_exports__["default"] = trimstring;
 
