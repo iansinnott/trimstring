@@ -1,53 +1,87 @@
-import R from 'ramda';
+import complement from 'ramda/src/complement';
+import isEmpty from 'ramda/src/isEmpty';
+import test from 'ramda/src/test';
+import compose from 'ramda/src/compose';
+import split from 'ramda/src/split';
+import filter from 'ramda/src/filter';
+import curry from 'ramda/src/curry';
+import join from 'ramda/src/join';
+import tap from 'ramda/src/tap';
+import map from 'ramda/src/map';
+import prop from 'ramda/src/prop';
+import match from 'ramda/src/match';
+import reduce from 'ramda/src/reduce';
+import min from 'ramda/src/min';
+import both from 'ramda/src/both';
+import head from 'ramda/src/head';
+import last from 'ramda/src/last';
+import { IO } from 'shirt';
 
-const stripLeadingTrailingNewlines = str =>
-  str.replace(/(^\n|\n$)/, '');
+import createDebugger from 'debug';
 
-const notEmpty = R.complement(R.isEmpty);
-const notJustNewlines = R.complement(R.test(/\n+/));
+const debug = createDebugger('trimstring:index'); // eslint-disable-line no-unused-vars
 
-const splitLines = R.compose(
-  R.filter(notEmpty),
-  R.split(/(\n+)/gm),
+const stripLeadingTrailingNewlines = str => {
+  const sections = str.split('\n');
+  let start = 0
+  let stop = undefined;
+
+  if (!/\S/g.test(head(sections))) start = 1;
+  if (!/\S/g.test(last(sections))) stop = -1;
+
+  return sections
+    .slice(start, stop)
+    .join('\n');
+};
+
+const notEmpty = complement(isEmpty);
+const notJustNewlines = complement(test(/\n+/));
+
+const splitLines = compose(
+  filter(notEmpty),
+  split(/(\n+)/gm),
   stripLeadingTrailingNewlines
 );
 
-const trimLeadingN = R.curry((n, str) => {
+const trimLeadingN = curry((n, str) => {
   const matchChars = Array(n).fill('.').join('');
   const re = new RegExp(`^(${matchChars})`, 'gm');
   return str.replace(re, '');
 });
 
 const makeHeredoc = n =>
-  R.compose(
-    R.join(''),
-    R.map(trimLeadingN(n)),
+  compose(
+    join(''),
+    map(trimLeadingN(n)),
     splitLines
   );
 
 
-const countLeadingWhitespace = R.compose(
-  R.prop('length'),
-  R.head,
-  R.match(/^(\s+)/gm)
+const countLeadingWhitespace = compose(
+  prop('length'),
+  tap(debug),
+  head,
+  match(/^(\s+)/gm)
 );
 
-const reducer = (agg, x) => {
-  const n = countLeadingWhitespace(x);
-  return n < agg ? n : agg;
-}
-
-const getMinLeadingWhitespace = R.compose(
-  R.reduce(R.min, Infinity),
-  R.map(countLeadingWhitespace),
-  R.filter(R.both(notEmpty, notJustNewlines))
+const getMinLeadingWhitespace = compose(
+  reduce(min, Infinity),
+  map(countLeadingWhitespace),
+  filter(both(notEmpty, notJustNewlines))
 );
 
-const alltogether = str => {
-  const n = getMinLeadingWhitespace(splitLines(str));
-  return makeHeredoc(n)(str);
-};
-
+// FOR some reason the prop('length') call above is getting called, even without
+// folding. Something is off here, because this IO has been unable to catch
+// anything so far
+//
+// NOTE: it seems that there should likely be a more simple way to handle this
+// logic using .map(makeHereDoc).ap(IO.of(str)) instead of doing it in a
+// point-ful fashion.
 export default function trimstring(str) {
-  return str;
+  return IO.of(str)
+    .map(splitLines)
+    .map(getMinLeadingWhitespace)
+    .map(n =>
+      makeHeredoc(n)(str)) // See NOTE
+    .fold(() => str, x => x); // Just return original object if the operation failed
 };
