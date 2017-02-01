@@ -1,6 +1,6 @@
 {
   "name": "trimstring",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Neatly trim template strings",
   "license": "MIT",
   "repository": "iansinnott/trimstring",
