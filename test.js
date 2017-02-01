@@ -52,6 +52,35 @@ Interpolation is fine of course.
   // NOTE: trimstring just trims leading whitespace if given a standard string
   t.is(trimstring('        hey'), 'hey');
 
+  const genHtml = props => {
+    return trimstring(`
+      <!doctype html>
+      <html lang='en'>
+        <head>
+          <meta charset='utf-8'>
+          <title>${props.title}</title>
+        </head>
+        <body>
+          ${props.body}
+        </body>
+      </html>
+    `);
+  };
+
+  expected =
+`<!doctype html>
+<html lang='en'>
+  <head>
+    <meta charset='utf-8'>
+    <title>Trimstring</title>
+  </head>
+  <body>
+    This is my favorite library!
+  </body>
+</html>`;
+
+  t.is(genHtml({ title: 'Trimstring', body: 'This is my favorite library!' }), expected);
+
   // For now the way we handle non string values is simply to return them
   t.deepEqual(trimstring({}), {});
   t.is(trimstring(false), false);
