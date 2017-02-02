@@ -3,7 +3,7 @@
 [![Build Status](https://img.shields.io/circleci/project/iansinnott/trimstring.svg)](https://circleci.com/gh/iansinnott/trimstring)
 [![trimstring on NPM](https://img.shields.io/npm/v/trimstring.svg)](https://www.npmjs.com/package/trimstring)
 
-> Neatly trim template strings
+> 🔪 Neatly trim template strings
 
 
 ## Install
